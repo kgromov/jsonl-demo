@@ -4,7 +4,7 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -15,10 +15,20 @@ import java.util.concurrent.Callable;
 public class App {
 
     static void main() throws Exception {
-        JsonMapper jsonMapper = JsonMapper.builder().build();
-        Path countriesJsonl = Paths.get(App.class.getClassLoader().getResource("countries.jsonl").toURI());
+
+
+        Callable<List<Country>> callable2 = () -> {
+            JsonMapper jsonMapper = JsonMapper.builder().build();
+            Path countriesJsonl = Paths.get(App.class.getClassLoader().getResource("countries.jsonl").toURI());
+            return Files.readAllLines(countriesJsonl).stream()
+                    .map(line -> jsonMapper.readValue(line, Country.class))
+                    .toList();
+        };
+        logDuration("Files#readAllLines", callable2);
 
         Callable<List<Country>> callable1 = () -> {
+            JsonMapper jsonMapper = JsonMapper.builder().build();
+            Path countriesJsonl = Paths.get(App.class.getClassLoader().getResource("countries.jsonl").toURI());
             try (var lines = Files.lines(countriesJsonl)) {
                 return lines
                         .map(line -> jsonMapper.readValue(line, Country.class))
@@ -27,14 +37,15 @@ public class App {
                 throw new RuntimeException(e);
             }
         };
-        logDuration("Files#lines", callable1);
 
-        Callable<List<Country>> callable2 = () -> {
-            return Files.readAllLines(countriesJsonl).stream()
-                    .map(line -> jsonMapper.readValue(line, Country.class))
-                    .toList();
+        logDuration("Files#lines", callable1);
+        Callable<List<Country>> fromJson = () -> {
+            JsonMapper jsonMapper = JsonMapper.builder().build();
+            try(InputStream inputStream = App.class.getClassLoader().getResource("countries.json").openStream()) {
+                return jsonMapper.readValue(inputStream, new TypeReference<>() {});
+            }
         };
-        logDuration("Files#readAllLines", callable2);
+        logDuration("JsonMapper#readValue", fromJson);
     }
 
     private static void logDuration(String message, Callable<List<Country>> countries) throws Exception {
